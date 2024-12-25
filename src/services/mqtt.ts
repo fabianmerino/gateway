@@ -18,25 +18,17 @@ export class MqttService {
   }
 
   private async connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.client = mqtt.connect(this.config.broker, {
-        clientId: this.config.clientId,
-        username: this.config.username,
-        password: this.config.password,
-        reconnectPeriod: 0, // Disable built-in reconnection
-      });
-
-      this.client.once('connect', () => {
-        logInfo(COMPONENT, 'Connected to MQTT broker');
-        resolve();
-      });
-
-      this.client.once('error', (error) => {
-        reject(error);
-      });
-
-      this.setupEventHandlers();
+    this.client = await mqtt.connectAsync(this.config.broker, {
+      clientId: this.config.clientId,
+      username: this.config.username,
+      password: this.config.password,
     });
+
+    this.client?.once('connect', () => {
+      logInfo(COMPONENT, 'Connected to MQTT broker');
+    });
+
+    this.setupEventHandlers();
   }
 
   private setupEventHandlers(): void {
@@ -50,14 +42,18 @@ export class MqttService {
     this.client.on('error', (error) => {
       logError(COMPONENT, 'MQTT connection error', error);
     });
+
+    this.client.on('offline', () => {
+      logInfo(COMPONENT, 'MQTT connection offline, attempting to reconnect...');
+      void this.reconnectionManager.start();
+    });
   }
 
-  public async start(): Promise<MqttClient> {
+  public async start(): Promise<void> {
     await this.reconnectionManager.start();
     if (!this.client) {
       throw new Error('MQTT client not initialized');
     }
-    return this.client;
   }
 
   public stop(): void {

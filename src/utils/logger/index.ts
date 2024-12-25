@@ -21,3 +21,17 @@ export const logError = (
     message
   );
 };
+
+export const logWarn = (
+  component: string,
+  message: string,
+  error?: Error | unknown
+) => {
+  logger.warn(
+    {
+      component,
+      err: error instanceof Error ? error : new Error(String(error)),
+    },
+    message
+  );
+};

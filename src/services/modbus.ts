@@ -2,9 +2,9 @@ import type { MqttClient } from 'mqtt';
 import * as net from 'node:net';
 import Modbus from 'jsmodbus';
 import type { ModbusConfig, ModbusTag } from '../types/config.js';
-import { publishMessage } from './mqtt.js';
 import { logInfo, logError } from '../utils/logger/index.js';
 import { ReconnectionManager } from '../utils/reconnection.js';
+import type { MqttService } from './mqtt.js';
 
 const COMPONENT = 'MqttService';
 
@@ -16,7 +16,7 @@ export class ModbusService {
 
   constructor(
     private readonly config: ModbusConfig,
-    private readonly mqttClient: MqttClient
+    private readonly mqttService: MqttService
   ) {
     this.socket = new net.Socket();
     this.client = new Modbus.client.TCP(this.socket);
@@ -96,7 +96,7 @@ export class ModbusService {
         };
 
         const topic = `industrial/modbus/${tag.name}`;
-        this.mqttClient.publish(topic, Buffer.from(JSON.stringify(message)));
+        this.publishToMqtt(topic, message);
         logInfo(COMPONENT, `Tag value updated: ${tag.name} = ${value}`);
       } catch (error) {
         logError(COMPONENT, `Error reading tag ${tag.name}`, error);
@@ -116,5 +116,9 @@ export class ModbusService {
     } catch (error) {
       throw new Error(`Failed to read Modbus register: ${error}`);
     }
+  }
+
+  private publishToMqtt(topic: string, message: object): void {
+    this.mqttService.publish(topic, message);
   }
 }

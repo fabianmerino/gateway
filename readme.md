@@ -18,7 +18,7 @@ The configuration file is located at `config.yaml` and contains the following se
 - `opcua`: Configuration for the OPC UA servers.
 - `modbus`: Configuration for the Modbus TCP servers.
 
-Each section contains the following properties:
+The `mqtt` section contains the following properties:
 
 - `broker`: The MQTT broker URL.
 - `clientId`: The MQTT client ID.

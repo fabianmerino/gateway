@@ -3,10 +3,11 @@ import {
   MessageSecurityMode,
   SecurityPolicy,
   AttributeIds,
+  TimestampsToReturn,
   type ClientSession,
   type ClientSubscription,
-  type MonitoredItem,
-  TimestampsToReturn,
+  type MonitoringParametersOptions,
+  type ReadValueIdOptions,
 } from 'node-opcua';
 import type { OpcuaConfig } from '../types/config.js';
 import { logInfo, logError } from '../utils/logger/index.js';
@@ -57,18 +58,22 @@ export class OpcuaService {
 
     // Subscribe to tags
     for (const tag of this.config.tags) {
-      this.subscribe(tag.nodeId, (value) => {
-        const message = {
-          timestamp: new Date().toISOString(),
-          nodeId: tag.nodeId,
-          value,
-          status: value === null ? 'null' : 'ok',
-        };
+      this.subscribe(
+        tag.nodeId,
+        (value) => {
+          const message = {
+            timestamp: new Date().toISOString(),
+            nodeId: tag.nodeId,
+            value,
+            status: value === null ? 'null' : 'ok',
+          };
 
-        const topic = `industrial/opcua/${tag.name}`;
-        this.publishToMqtt(topic, message);
-        logInfo(COMPONENT, `Tag value updated: ${tag.name} = ${value}`);
-      });
+          const topic = `industrial/opcua/${tag.name}`;
+          this.publishToMqtt(topic, message);
+          logInfo(COMPONENT, `Tag value updated: ${tag.name} = ${value}`);
+        },
+        { samplingInterval: tag.interval ?? 1000 }
+      );
     }
 
     this.client.on('connection_lost', () => {
@@ -113,7 +118,8 @@ export class OpcuaService {
 
   public async subscribe(
     nodeId: string,
-    callback: (value: unknown) => void
+    callback: (value: unknown) => void,
+    options?: MonitoringParametersOptions
   ): Promise<void> {
     if (!this.session) {
       throw new Error('No active session');
@@ -131,15 +137,16 @@ export class OpcuaService {
         });
       }
 
-      const itemToMonitor = {
+      const itemToMonitor: ReadValueIdOptions = {
         nodeId,
         attributeId: AttributeIds.Value,
       };
 
-      const parameters = {
+      const parameters: MonitoringParametersOptions = {
         samplingInterval: 1000,
         discardOldest: true,
         queueSize: 10,
+        ...options,
       };
 
       const monitoredItem = await this.subscription.monitor(

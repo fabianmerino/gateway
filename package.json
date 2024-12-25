@@ -1,7 +1,9 @@
 {
-  "name": "industrial-monitoring",
-  "version": "1.0.0",
+  "name": "industrial-monitoring-gateway",
+  "version": "0.0.2",
   "type": "module",
+  "main": "dist/index.js",
+  "license": "MIT",
   "scripts": {
     "start": "cross-env NODE_ENV=\"production\" node dist/index.js",
     "dev": "tsx watch src/index.ts",

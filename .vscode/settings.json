@@ -1,0 +1,12 @@
+{
+    "biome.enabled": true,
+    "[typescript]": {
+        "editor.defaultFormatter": "biomejs.biome"
+    },
+    "biome.rename": true,
+    "cSpell.words": [
+        "jsmodbus",
+        "modbus",
+        "Modbus"
+    ],
+}

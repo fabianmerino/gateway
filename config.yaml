@@ -1,0 +1,28 @@
+mqtt:
+  broker: mqtt://localhost:1883
+  clientId: industrial-monitor
+  username: user
+  password: pass
+
+opcua:
+  serverUrl: opc.tcp://localhost:49320
+  tags:
+    - nodeId: "ns=2;s=SIDESAL.despacho.ALCOHOL_FT01_PARCIAL"
+      name: "kg_tank_1302"
+      interval: 1000
+    - nodeId: "ns=2;s=SIDESAL.despacho.ALCOHOL_FT02_PARCIAL"
+      name: "kg_tank_1309"
+      interval: 2000
+
+modbus:
+  host: localhost
+  port: 502
+  tags:
+    - register: 40001
+      name: "flow_meter_1"
+      type: "holding"
+      interval: 1000
+    - register: 30001
+      name: "level_sensor_1"
+      type: "input"
+      interval: 2000

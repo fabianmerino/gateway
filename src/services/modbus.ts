@@ -14,7 +14,6 @@ export class ModbusService {
   private reconnectionManager: ReconnectionManager;
   private isConnected = false;
   private monitoredVariables: Map<string, MonitoredVariable> = new Map();
-  private lastValues: Map<string, number> = new Map();
 
   constructor(
     private readonly config: ModbusConfig,
@@ -139,37 +138,6 @@ export class ModbusService {
       return response.response.body.values[0];
     } catch (error) {
       throw new Error(`Failed to read Modbus register: ${error}`);
-    }
-  }
-
-  private async readTag(tag: ModbusTag): Promise<void> {
-    if (!this.client) {
-      throw new Error('Modbus client not initialized');
-    }
-
-    try {
-      let value: number;
-      switch (tag.type) {
-        case 'holding':
-          value = (await this.client.readHoldingRegisters(tag.register, 1)).response.body.values[0];
-          break;
-        case 'input':
-          value = (await this.client.readInputRegisters(tag.register, 1)).response.body.values[0];
-          break;
-        case 'coil':
-          value = (await this.client.readCoils(tag.register, 1)).response.body.values[0] ? 1 : 0;
-          break;
-        default:
-          throw new Error(`Unsupported tag type: ${tag.type}`);
-      }
-
-      const lastValue = this.lastValues.get(tag.name);
-      if (lastValue === undefined || Math.abs(value - lastValue) >= (tag.delta ?? 0)) {
-        this.sparkplugService.publishDeviceData(tag.name, value);
-        this.lastValues.set(tag.name, value);
-      }
-    } catch (error) {
-      logError(COMPONENT, `Error reading tag ${tag.name}`, error);
     }
   }
 }

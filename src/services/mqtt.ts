@@ -3,7 +3,7 @@ import type { MqttConfig } from '../types/config.js';
 import { logInfo, logError } from '../utils/logger/index.js';
 import { ReconnectionManager } from '../utils/reconnection.js';
 
-const COMPONENT = 'MqttService';
+export const COMPONENT = 'MqttService';
 
 export class MqttService {
   private client?: MqttClient;
@@ -49,11 +49,12 @@ export class MqttService {
     });
   }
 
-  public async start(): Promise<void> {
+  public async start(): Promise<MqttClient> {
     await this.reconnectionManager.start();
     if (!this.client) {
       throw new Error('MQTT client not initialized');
     }
+    return this.client;
   }
 
   public stop(): void {

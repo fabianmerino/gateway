@@ -4,7 +4,8 @@
         "parser": {
             "syntax": "typescript",
             "tsx": false,
-            "decorators": true
+            "decorators": true,
+            "dynamicImport": true
         },
         "target": "es2022",
         "loose": false,
@@ -14,7 +15,10 @@
         }
     },
     "module": {
-        "type": "es6"
+        "type": "es6",
+        "strict": true,
+        "strictMode": true,
+        "noInterop": false
     },
     "minify": false,
     "isModule": true

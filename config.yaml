@@ -3,26 +3,38 @@ mqtt:
   clientId: industrial-monitor
   username: user
   password: pass
+  sparkplug:
+    groupId: "Sparkplug B Devices"
+    edgeNode: "Node-1"
+    deviceId: "Device-1"
+    scadaHostId: "SCADA-1"
+    publishPeriod: 1000
 
 opcua:
+  enabled: true
   serverUrl: opc.tcp://localhost:49320
   tags:
     - nodeId: "ns=2;s=SIDESAL.despacho.ALCOHOL_FT01_PARCIAL"
       name: "kg_tank_1302"
       interval: 1000
+      delta: 0.5
     - nodeId: "ns=2;s=SIDESAL.despacho.ALCOHOL_FT02_PARCIAL"
       name: "kg_tank_1309"
       interval: 2000
+      delta: 1.0
 
 modbus:
+  enabled: true
   host: localhost
-  port: 502
+  port: 5020
   tags:
     - register: 40001
       name: "flow_meter_1"
       type: "holding"
       interval: 1000
+      delta: 0.1
     - register: 30001
       name: "level_sensor_1"
       type: "input"
       interval: 2000
+      delta: 0.5

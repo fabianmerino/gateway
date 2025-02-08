@@ -8,32 +8,33 @@ import {
   type ClientSubscription,
   type MonitoringParametersOptions,
   type ReadValueIdOptions,
+  type DataValue,
 } from 'node-opcua';
 import type { OpcuaConfig } from '../types/config.js';
 import { logInfo, logError } from '../utils/logger/index.js';
 import { ReconnectionManager } from '../utils/reconnection.js';
-import type { MqttService } from './mqtt.js';
+import type { MonitoredVariable } from '../types/index.js';
+import type { SparkplugService } from './sparkplug.js';
 
 const COMPONENT = 'OpcuaService';
 
 export class OpcuaService {
-  private client?: OPCUAClient;
+  private client: OPCUAClient;
   private session?: ClientSession;
   private subscription?: ClientSubscription;
   private reconnectionManager: ReconnectionManager;
+  private monitoredVariables: Map<string, MonitoredVariable> = new Map();
 
   constructor(
     private readonly config: OpcuaConfig,
-    private readonly mqttService: MqttService
+    private readonly sparkplugService: SparkplugService
   ) {
     this.reconnectionManager = new ReconnectionManager(
       COMPONENT,
       { initialDelay: 1000, maxDelay: 30000 },
       () => this.connect()
     );
-  }
 
-  private async connect(): Promise<void> {
     this.client = OPCUAClient.create({
       applicationName: 'industrial-monitoring',
       connectionStrategy: {
@@ -45,12 +46,24 @@ export class OpcuaService {
       endpointMustExist: false,
     });
 
-    await this.client.connect(this.config.serverUrl);
-    this.session = await this.client.createSession();
+    this.initializeMonitoredVariables();
+  }
 
-    logInfo(COMPONENT, 'Connected to OPC UA server');
+  private async connect(): Promise<void> {
+    try {
+      await this.client.connect(this.config.serverUrl);
+      logInfo(COMPONENT, 'Connected to OPC UA server');
 
-    this.setupEventHandlers();
+      this.session = await this.client.createSession();
+      logInfo(COMPONENT, 'OPC UA session created');
+
+      logInfo(COMPONENT, 'Connected to OPC UA server');
+
+      this.setupEventHandlers();
+    } catch (error) {
+      logError(COMPONENT, 'OPC UA error', error);
+      throw error;
+    }
   }
 
   private setupEventHandlers(): void {
@@ -60,16 +73,19 @@ export class OpcuaService {
     for (const tag of this.config.tags) {
       this.subscribe(
         tag.nodeId,
-        (value) => {
-          const message = {
-            timestamp: new Date().toISOString(),
-            nodeId: tag.nodeId,
-            value,
-            status: value === null ? 'null' : 'ok',
-          };
+        (dataValue) => {
+          const value = dataValue.value.value;
+          // Update local variable state
+          const variable = this.monitoredVariables.get(tag.name);
+          if (variable && variable.value && Math.abs(value - variable.value) >= (tag.delta ?? 0)) {
+            variable.value = value;
+            this.monitoredVariables.set(tag.name, variable);
+            this.sparkplugService.updateMetric(tag.name, value, tag.interval);
+            logInfo(COMPONENT, `Tag value updated: ${tag.name} = ${value}`);
+          }
 
-          const topic = `industrial/opcua/${tag.name}`;
-          this.publishToMqtt(topic, message);
+          // Update Sparkplug metric
+          this.sparkplugService.updateMetric(tag.name, value, tag.interval);
           logInfo(COMPONENT, `Tag value updated: ${tag.name} = ${value}`);
         },
         { samplingInterval: tag.interval ?? 1000 }
@@ -93,11 +109,22 @@ export class OpcuaService {
     });
   }
 
+  private initializeMonitoredVariables(): void {
+    for (const tag of this.config.tags) {
+      this.monitoredVariables.set(tag.name, {
+        name: tag.name,
+        type: 'Double',
+        value: null,
+      });
+    }
+  }
+
+  public getMonitoredVariables(): MonitoredVariable[] {
+    return Array.from(this.monitoredVariables.values());
+  }
+
   public async start(): Promise<void> {
     await this.reconnectionManager.start();
-    if (!this.client || !this.session) {
-      throw new Error('OPC UA client not initialized');
-    }
   }
 
   public async stop(): Promise<void> {
@@ -118,7 +145,7 @@ export class OpcuaService {
 
   public async subscribe(
     nodeId: string,
-    callback: (value: unknown) => void,
+    callback: (value: DataValue) => void,
     options?: MonitoringParametersOptions
   ): Promise<void> {
     if (!this.session) {
@@ -155,16 +182,10 @@ export class OpcuaService {
         TimestampsToReturn.Both
       );
 
-      monitoredItem.on('changed', (dataValue) => {
-        callback(dataValue.value.value);
-      });
+      monitoredItem.on('changed', callback);
     } catch (error) {
       logError(COMPONENT, `Error subscribing to nodeId ${nodeId}`, error);
       throw error;
     }
-  }
-
-  private publishToMqtt(topic: string, message: object): void {
-    this.mqttService.publish(topic, message);
   }
 }

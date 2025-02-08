@@ -77,7 +77,7 @@ export class OpcuaService {
           const value = dataValue.value.value;
           // Update local variable state
           const variable = this.monitoredVariables.get(tag.name);
-          if (variable && variable.value && Math.abs(value - variable.value) >= (tag.delta ?? 0)) {
+          if (variable?.value && Math.abs(value - variable.value) >= (tag.delta ?? 0)) {
             variable.value = value;
             this.monitoredVariables.set(tag.name, variable);
             this.sparkplugService.updateMetric(tag.name, value, tag.interval);

@@ -7,6 +7,8 @@
     "cSpell.words": [
         "jsmodbus",
         "modbus",
-        "Modbus"
+        "Modbus",
+        "scada"
     ],
+    "sqltools.useNodeRuntime": true,
 }

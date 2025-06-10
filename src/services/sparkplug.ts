@@ -18,6 +18,9 @@ interface DeviceMetrics {
   metrics: Map<string, MetricData>;
   registeredAt: number;
   lastActivity: number;
+  dbirthSent: boolean;
+  pendingDbirth: boolean;
+  expectedTags?: number; // Number of expected tags for this device
 }
 
 export class SparkplugService {
@@ -95,6 +98,17 @@ export class SparkplugService {
   private handleConnect() {
     logInfo(COMPONENT, 'Connected to Sparkplug broker');
     this.isConnected = true;
+
+    // Send pending DBIRTHs for devices that have metrics
+    for (const device of this.devices.values()) {
+      if (
+        device.metrics.size > 0 &&
+        (!device.dbirthSent || device.pendingDbirth)
+      ) {
+        this.sendDBirth(device.deviceId);
+      }
+    }
+
     this.sendStoredMessages();
   }
 
@@ -147,6 +161,7 @@ export class SparkplugService {
     }
     this.client?.stop();
   }
+
   public updateMetric(
     deviceId: string,
     name: string,
@@ -162,13 +177,10 @@ export class SparkplugService {
         metrics: new Map(),
         registeredAt: now,
         lastActivity: now,
+        dbirthSent: false,
+        pendingDbirth: false,
       });
       logInfo(COMPONENT, `Registered new device: ${deviceId}`);
-
-      // Send DBIRTH for new device if connected
-      if (this.isConnected) {
-        this.sendDBirth(deviceId);
-      }
     }
 
     const device = this.devices.get(deviceId)!;
@@ -184,7 +196,14 @@ export class SparkplugService {
         lastPublished: 0, // Force first publish
         lastUpdated: now,
       });
-      this.publishMetric(deviceId, name, value);
+
+      // Check if we should send DBIRTH now
+      this.checkAndSendDBirth(deviceId);
+
+      // If DBIRTH was sent, we can publish the metric immediately
+      if (device.dbirthSent) {
+        this.publishMetric(deviceId, name, value);
+      }
     } else if (currentMetric.value !== value) {
       // Value changed, update it
       device.metrics.set(name, {
@@ -198,7 +217,16 @@ export class SparkplugService {
 
   private sendAllDBirths(): void {
     for (const device of this.devices.values()) {
-      this.sendDBirth(device.deviceId);
+      // Only send DBIRTH if device has metrics
+      if (device.metrics.size > 0) {
+        this.sendDBirth(device.deviceId);
+      } else {
+        device.pendingDbirth = true;
+        logInfo(
+          COMPONENT,
+          `Marking ${device.deviceId} for pending DBIRTH - waiting for metrics`
+        );
+      }
     }
   }
 
@@ -206,6 +234,16 @@ export class SparkplugService {
     const device = this.devices.get(deviceId);
     if (!device) {
       logError(COMPONENT, `Device ${deviceId} not found for DBIRTH`);
+      return;
+    }
+
+    // Don't send DBIRTH if no metrics are available
+    if (device.metrics.size === 0) {
+      logInfo(
+        COMPONENT,
+        `Delaying DBIRTH for ${deviceId} - no metrics available yet`
+      );
+      device.pendingDbirth = true;
       return;
     }
 
@@ -225,7 +263,12 @@ export class SparkplugService {
 
     try {
       this.client?.publishDeviceBirth(deviceId, payload);
-      logInfo(COMPONENT, `Published DBIRTH message for device ${deviceId}`);
+      device.dbirthSent = true;
+      device.pendingDbirth = false;
+      logInfo(
+        COMPONENT,
+        `Published DBIRTH message for device ${deviceId} with ${metrics.length} metrics`
+      );
     } catch (error) {
       logError(
         COMPONENT,
@@ -235,13 +278,54 @@ export class SparkplugService {
     }
   }
 
+  /**
+   * Check if device is ready for DBIRTH and send it if conditions are met
+   */
+  private checkAndSendDBirth(deviceId: string): void {
+    const device = this.devices.get(deviceId);
+    if (!device || !this.isConnected) {
+      return;
+    }
+
+    // Send DBIRTH if:
+    // 1. Not sent yet, or pending
+    // 2. Has at least one metric
+    // 3. Connected to broker
+    // 4. Optionally: has reached expected number of tags
+    const hasMinimumMetrics = device.metrics.size > 0;
+    const hasExpectedMetrics =
+      !device.expectedTags || device.metrics.size >= device.expectedTags;
+
+    if (
+      (!device.dbirthSent || device.pendingDbirth) &&
+      hasMinimumMetrics &&
+      hasExpectedMetrics
+    ) {
+      this.sendDBirth(deviceId);
+    } else if (
+      device.expectedTags &&
+      device.metrics.size < device.expectedTags
+    ) {
+      logInfo(
+        COMPONENT,
+        `Waiting for more metrics for ${deviceId}: ${device.metrics.size}/${device.expectedTags}`
+      );
+    }
+  }
+
   private checkAndPublishMetrics(): void {
     const now = Date.now();
 
     for (const device of this.devices.values()) {
-      for (const [name, metric] of device.metrics.entries()) {
-        if (now - metric.lastPublished >= metric.interval) {
-          this.publishMetric(device.deviceId, name, metric.value);
+      // First ensure DBIRTH is sent if needed
+      this.checkAndSendDBirth(device.deviceId);
+
+      // Only publish metrics if DBIRTH has been sent
+      if (device.dbirthSent) {
+        for (const [name, metric] of device.metrics.entries()) {
+          if (now - metric.lastPublished >= metric.interval) {
+            this.publishMetric(device.deviceId, name, metric.value);
+          }
         }
       }
     }
@@ -252,6 +336,30 @@ export class SparkplugService {
     name: string,
     value: number
   ): Promise<void> {
+    const device = this.devices.get(deviceId);
+    if (!device) {
+      logError(
+        COMPONENT,
+        `Device ${deviceId} not found for metric publication`
+      );
+      return;
+    }
+
+    // Ensure DBIRTH is sent before sending any DDATA
+    if (!device.dbirthSent && this.isConnected) {
+      logInfo(COMPONENT, `Sending DBIRTH before DDATA for device ${deviceId}`);
+      this.checkAndSendDBirth(deviceId);
+
+      // If DBIRTH still not sent (no metrics), don't send DDATA
+      if (!device.dbirthSent) {
+        logInfo(
+          COMPONENT,
+          `Delaying DDATA for ${deviceId} - DBIRTH not sent yet`
+        );
+        return;
+      }
+    }
+
     const payload: UPayload = {
       timestamp: Date.now(),
       metrics: [
@@ -274,8 +382,9 @@ export class SparkplugService {
       } else {
         await this.storeMessage(deviceId, payload);
         logInfo(COMPONENT, `Stored metric for ${deviceId}: ${name} = ${value}`);
-      } // Update last published time
-      const device = this.devices.get(deviceId);
+      }
+
+      // Update last published time
       if (device?.metrics.has(name)) {
         const metric = device.metrics.get(name)!;
         metric.lastPublished = Date.now();
@@ -332,15 +441,47 @@ export class SparkplugService {
       );
     }
   }
+
+  /**
+   * Register a new device with Sparkplug B
+   * @param deviceId - The ID of the device to register
+   */
+  public registerDevice(deviceId: string): void {
+    if (this.devices.has(deviceId)) {
+      logInfo(COMPONENT, `Device ${deviceId} is already registered`);
+      return;
+    }
+
+    const device: DeviceMetrics = {
+      deviceId,
+      metrics: new Map(),
+      lastActivity: Date.now(),
+      registeredAt: Date.now(),
+      dbirthSent: false,
+      pendingDbirth: false,
+    };
+
+    this.devices.set(deviceId, device);
+    logInfo(COMPONENT, `Registered new device: ${deviceId}`);
+  }
+
+  /**
+   * Get all registered devices
+   */
   public getRegisteredDevices(): string[] {
     return Array.from(this.devices.keys());
   }
 
+  /**
+   * Get metrics for a specific device
+   * @param deviceId - The ID of the device to get metrics for
+   */
   public getDeviceMetrics(
     deviceId: string
   ): Map<string, MetricData> | undefined {
     return this.devices.get(deviceId)?.metrics;
   }
+
   /**
    * Get all devices with their metrics summary
    */
@@ -360,14 +501,15 @@ export class SparkplugService {
       isActive: now - device.lastActivity < 30000, // Active if updated within last 30 seconds
     }));
   }
+
   /**
    * Remove a device and all its metrics
    */
   public removeDevice(deviceId: string): boolean {
     const device = this.devices.get(deviceId);
     if (device) {
-      // Send DDEATH message before removing device
-      if (this.isConnected) {
+      // Send DDEATH message before removing device (only if DBIRTH was sent)
+      if (this.isConnected && device.dbirthSent) {
         this.sendDDeath(deviceId);
       }
 
@@ -476,10 +618,49 @@ export class SparkplugService {
     const now = Date.now();
     let activeCount = 0;
     for (const device of this.devices.values()) {
-      if (now - device.lastActivity < 30000) { // Active if updated within last 30 seconds
+      if (now - device.lastActivity < 30000) {
+        // Active if updated within last 30 seconds
         activeCount++;
       }
     }
     return activeCount;
+  }
+
+  /**
+   * Set expected number of tags for a device (helps optimize DBIRTH timing)
+   */
+  public setExpectedTags(deviceId: string, expectedTags: number): void {
+    const device = this.devices.get(deviceId);
+    if (device) {
+      device.expectedTags = expectedTags;
+      logInfo(COMPONENT, `Set expected tags for ${deviceId}: ${expectedTags}`);
+
+      // Check if we can send DBIRTH now
+      this.checkAndSendDBirth(deviceId);
+    }
+  }
+
+  /**
+   * Get device status including DBIRTH information
+   */
+  public getDeviceStatus(deviceId: string): {
+    exists: boolean;
+    dbirthSent: boolean;
+    pendingDbirth: boolean;
+    metricCount: number;
+    expectedTags?: number;
+  } | null {
+    const device = this.devices.get(deviceId);
+    if (!device) {
+      return null;
+    }
+
+    return {
+      exists: true,
+      dbirthSent: device.dbirthSent,
+      pendingDbirth: device.pendingDbirth,
+      metricCount: device.metrics.size,
+      expectedTags: device.expectedTags,
+    };
   }
 }

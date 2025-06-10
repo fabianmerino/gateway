@@ -22,6 +22,12 @@ export class ModbusService {
   ) {
     // Generate device name if not provided
     this.deviceName = config.deviceName || 'device-modbus-1';
+    this.sparkplugService.registerDevice(this.deviceName);
+    // Inform Sparkplug service about expected number of tags
+    this.sparkplugService.setExpectedTags(
+      this.deviceName,
+      this.config.tags.length
+    );
 
     this.socket = new net.Socket();
     this.client = new Modbus.client.TCP(this.socket);

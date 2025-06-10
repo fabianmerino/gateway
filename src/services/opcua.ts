@@ -25,6 +25,7 @@ export class OpcuaService {
   private reconnectionManager: ReconnectionManager;
   private monitoredVariables: Map<string, MonitoredVariable> = new Map();
   private deviceName: string;
+
   constructor(
     private readonly config: OpcuaConfig,
     private readonly sparkplugService: SparkplugService
@@ -32,10 +33,13 @@ export class OpcuaService {
     // Generate device name if not provided
     this.deviceName = config.deviceName || 'device-opcua-1';
 
-    this.reconnectionManager = new ReconnectionManager(
-      COMPONENT,
-      { initialDelay: 1000, maxDelay: 30000 },
-      () => this.connect()
+    // Register device with Sparkplug service
+    this.sparkplugService.registerDevice(this.deviceName);
+
+    // Inform Sparkplug service about expected number of tags
+    this.sparkplugService.setExpectedTags(
+      this.deviceName,
+      this.config.tags.length
     );
 
     this.client = OPCUAClient.create({
@@ -49,6 +53,12 @@ export class OpcuaService {
       endpointMustExist: false,
     });
 
+    this.reconnectionManager = new ReconnectionManager(
+      COMPONENT,
+      { initialDelay: 1000, maxDelay: 30000 },
+      () => this.connect()
+    );
+
     this.initializeMonitoredVariables();
   }
 
@@ -59,8 +69,6 @@ export class OpcuaService {
 
       this.session = await this.client.createSession();
       logInfo(COMPONENT, 'OPC UA session created');
-
-      logInfo(COMPONENT, 'Connected to OPC UA server');
 
       this.setupEventHandlers();
     } catch (error) {
@@ -78,31 +86,29 @@ export class OpcuaService {
         tag.nodeId,
         (dataValue) => {
           const value = dataValue.value.value;
+
           // Update local variable state
           const variable = this.monitoredVariables.get(tag.name);
-          if (
-            variable?.value &&
-            Math.abs(value - variable.value) >= (tag.delta ?? 0)
-          ) {
-            variable.value = value;
-            this.monitoredVariables.set(tag.name, variable);
-            this.sparkplugService.updateMetric(
-              this.deviceName,
-              tag.name,
-              value,
-              tag.interval
-            );
-            logInfo(COMPONENT, `Tag value updated: ${tag.name} = ${value}`);
-          }
+          if (variable) {
+            // Check if value has changed significantly based on delta
+            const hasChanged =
+              variable.value === null ||
+              Math.abs(value - variable.value) >= (tag.delta ?? 0);
 
-          // Update Sparkplug metric
-          this.sparkplugService.updateMetric(
-            this.deviceName,
-            tag.name,
-            value,
-            tag.interval
-          );
-          logInfo(COMPONENT, `Tag value updated: ${tag.name} = ${value}`);
+            if (hasChanged) {
+              variable.value = value;
+              this.monitoredVariables.set(tag.name, variable);
+
+              // Update Sparkplug metric
+              this.sparkplugService.updateMetric(
+                this.deviceName,
+                tag.name,
+                value,
+                tag.interval
+              );
+              logInfo(COMPONENT, `Tag value updated: ${tag.name} = ${value}`);
+            }
+          }
         },
         { samplingInterval: tag.interval ?? 1000 }
       );

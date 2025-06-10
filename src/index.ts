@@ -89,8 +89,14 @@ async function main() {
     // Log configuration summary
     logInfo(COMPONENT, 'Configuration Summary:');
     logInfo(COMPONENT, '- Sparkplug Service: 1 instance');
-    logInfo(COMPONENT, `- Modbus Services: ${modbusServices.length} configured, ${config.modbus.filter(c => c.enabled).length} enabled`);
-    logInfo(COMPONENT, `- OPC UA Services: ${opcuaServices.length} configured, ${config.opcua.filter(c => c.enabled).length} enabled`);
+    logInfo(
+      COMPONENT,
+      `- Modbus Services: ${modbusServices.length} configured, ${config.modbus.filter((c) => c.enabled).length} enabled`
+    );
+    logInfo(
+      COMPONENT,
+      `- OPC UA Services: ${opcuaServices.length} configured, ${config.opcua.filter((c) => c.enabled).length} enabled`
+    );
     logInfo(COMPONENT, `- Total Services to Start: ${servicesToStart.length}`);
 
     const services = await Promise.allSettled(

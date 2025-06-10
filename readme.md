@@ -1,6 +1,6 @@
 # Industrial Monitoring Gateway
 
-This is a simple Industrial Monitoring Gateway that connects to MQTT brokers, OPC UA servers, and Modbus TCP servers to collect data and publish it to a MQTT broker.
+This Industrial Monitoring Gateway collects data from OPC UA servers and Modbus TCP devices. It then publishes this data to an MQTT broker using the Sparkplug B protocol, acting as a Sparkplug Edge Node. The gateway also includes a local database to temporarily store messages if the MQTT broker is unavailable, ensuring data resilience.
 
 ## Installation
 
@@ -14,9 +14,11 @@ This is a simple Industrial Monitoring Gateway that connects to MQTT brokers, OP
 
 The configuration file is located at `config.yaml` and contains the following sections:
 
-- `mqtt`: Configuration for the MQTT broker.
+- `mqtt`: Configuration for the MQTT broker and Sparkplug B protocol.
 - `opcua`: Configuration for the OPC UA servers.
 - `modbus`: Configuration for the Modbus TCP servers.
+
+### MQTT Configuration
 
 The `mqtt` section contains the following properties:
 
@@ -24,9 +26,21 @@ The `mqtt` section contains the following properties:
 - `clientId`: The MQTT client ID.
 - `username`: The MQTT username (optional).
 - `password`: The MQTT password (optional).
+- `sparkplug`: Sparkplug B protocol configuration.
+
+The `sparkplug` subsection contains:
+
+- `groupId`: The Sparkplug group identifier.
+- `edgeNode`: The edge node identifier.
+- `deviceId`: The device identifier.
+- `scadaHostId`: The SCADA host identifier.
+- `publishPeriod`: The publish period in milliseconds.
+
+### OPC UA Configuration
 
 The `opcua` section contains the following properties:
 
+- `enabled`: Whether OPC UA is enabled (true/false).
 - `serverUrl`: The OPC UA server URL.
 - `tags`: An array of OPC UA tags to monitor.
 
@@ -35,9 +49,13 @@ Each OPC UA tag contains the following properties:
 - `nodeId`: The OPC UA node ID.
 - `name`: The name of the tag.
 - `interval`: The sampling interval in milliseconds.
+- `delta`: The minimum change threshold to trigger a data update.
+
+### Modbus Configuration
 
 The `modbus` section contains the following properties:
 
+- `enabled`: Whether Modbus is enabled (true/false).
 - `host`: The Modbus TCP server host.
 - `port`: The Modbus TCP server port.
 - `tags`: An array of Modbus tags to monitor.
@@ -48,16 +66,19 @@ Each Modbus tag contains the following properties:
 - `name`: The name of the tag.
 - `type`: The type of the tag (`holding` or `input`).
 - `interval`: The sampling interval in milliseconds.
+- `delta`: The minimum change threshold to trigger a data update.
 
 ## Usage
 
-The service starts automatically when the `pnpm start` command is executed. It will connect to the configured MQTT broker, OPC UA servers, and Modbus TCP servers and start monitoring the specified tags. The service will publish the monitored data to the MQTT broker with the following topic structure:
+The service starts automatically when the `pnpm start` command is executed. It connects to the configured OPC UA servers and Modbus TCP devices to monitor the specified tags. This data is then published to the configured MQTT broker using the Sparkplug B protocol. The gateway acts as a Sparkplug Edge Node, with its identity (`groupId`, `edgeNodeId`, `deviceId`) configured in `config.yaml`.
 
-```
-industrial/<service>/<tag>
-```
+Data is published using Sparkplug B messages, primarily:
+- **Device Birth (DBIRTH):** Announces the device and its metrics.
+  - Topic: `spBv1.0/<groupId>/DBIRTH/<edgeNodeId>/<deviceId>`
+- **Device Data (DDATA):** Transmits metric values.
+  - Topic: `spBv1.0/<groupId>/DDATA/<edgeNodeId>/<deviceId>`
 
-Where `<service>` is either `opcua`, `modbus`, or `mqtt`, and `<tag>` is the name of the tag.
+The specific tag data (name, value, type, timestamp) is contained within the payload of these Sparkplug B messages. For detailed information on the Sparkplug B specification, including full topic structures and payload formats, please refer to the official Sparkplug documentation.
 
 ## License
 
@@ -84,4 +105,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-```

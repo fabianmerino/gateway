@@ -36,19 +36,19 @@ async function main() {
       { name: 'Sparkplug', startFn: () => sparkplugService.start() }
     ];
 
-    let modbusService: ModbusService | undefined;
-    let opcuaService: OpcuaService | undefined;
+    let modbusService: ModbusService;
+    let opcuaService: OpcuaService;
 
     if (config.modbus.enabled) {
       modbusService = new ModbusService(config.modbus, sparkplugService);
-      servicesToStart.push({ name: 'Modbus', startFn: () => modbusService!.start() });
+      servicesToStart.push({ name: 'Modbus', startFn: () => modbusService.start() });
     } else {
       logWarn(COMPONENT, 'Modbus service disabled');
     }
 
     if (config.opcua.enabled) {
       opcuaService = new OpcuaService(config.opcua, sparkplugService);
-      servicesToStart.push({ name: 'OPC UA', startFn: () => opcuaService!.start() });
+      servicesToStart.push({ name: 'OPC UA', startFn: () => opcuaService.start() });
     } else {
       logWarn(COMPONENT, 'OPC UA service disabled');
     }

@@ -32,37 +32,81 @@ async function main() {
     await databaseService.init();
     const sparkplugService = new SparkplugService(config.mqtt);
 
-    const servicesToStart: Array<{ name: string; startFn: () => Promise<unknown> }> = [
-      { name: 'Sparkplug', startFn: () => sparkplugService.start() }
-    ];
+    const servicesToStart: Array<{
+      name: string;
+      startFn: () => Promise<unknown>;
+    }> = [{ name: 'Sparkplug', startFn: () => sparkplugService.start() }];
 
-    let modbusService: ModbusService;
-    let opcuaService: OpcuaService;
+    const modbusServices: ModbusService[] = [];
+    const opcuaServices: OpcuaService[] = [];
 
-    if (config.modbus.enabled) {
-      modbusService = new ModbusService(config.modbus, sparkplugService);
-      servicesToStart.push({ name: 'Modbus', startFn: () => modbusService.start() });
-    } else {
-      logWarn(COMPONENT, 'Modbus service disabled');
+    // Handle multiple Modbus configurations
+    for (let i = 0; i < config.modbus.length; i++) {
+      const modbusConfig = config.modbus[i];
+
+      if (!modbusConfig.enabled) {
+        logWarn(COMPONENT, `Modbus service ${i + 1} disabled`);
+        continue;
+      }
+
+      // Generate device name if not provided
+      if (!modbusConfig.deviceName) {
+        modbusConfig.deviceName = sparkplugService.generateDeviceName('modbus');
+      }
+
+      const modbusService = new ModbusService(modbusConfig, sparkplugService);
+      modbusServices.push(modbusService);
+
+      servicesToStart.push({
+        name: `Modbus-${i + 1} (${modbusConfig.deviceName})`,
+        startFn: () => modbusService.start(),
+      });
     }
 
-    if (config.opcua.enabled) {
-      opcuaService = new OpcuaService(config.opcua, sparkplugService);
-      servicesToStart.push({ name: 'OPC UA', startFn: () => opcuaService.start() });
-    } else {
-      logWarn(COMPONENT, 'OPC UA service disabled');
+    // Handle multiple OPC UA configurations
+    for (let i = 0; i < config.opcua.length; i++) {
+      const opcuaConfig = config.opcua[i];
+
+      if (!opcuaConfig.enabled) {
+        logWarn(COMPONENT, `OPC UA service ${i + 1} disabled`);
+        continue;
+      }
+
+      // Generate device name if not provided
+      if (!opcuaConfig.deviceName) {
+        opcuaConfig.deviceName = sparkplugService.generateDeviceName('opcua');
+      }
+
+      const opcuaService = new OpcuaService(opcuaConfig, sparkplugService);
+      opcuaServices.push(opcuaService);
+
+      servicesToStart.push({
+        name: `OPC UA-${i + 1} (${opcuaConfig.deviceName})`,
+        startFn: () => opcuaService.start(),
+      });
     }
+
+    // Log configuration summary
+    logInfo(COMPONENT, 'Configuration Summary:');
+    logInfo(COMPONENT, '- Sparkplug Service: 1 instance');
+    logInfo(COMPONENT, `- Modbus Services: ${modbusServices.length} configured, ${config.modbus.filter(c => c.enabled).length} enabled`);
+    logInfo(COMPONENT, `- OPC UA Services: ${opcuaServices.length} configured, ${config.opcua.filter(c => c.enabled).length} enabled`);
+    logInfo(COMPONENT, `- Total Services to Start: ${servicesToStart.length}`);
 
     const services = await Promise.allSettled(
-      servicesToStart.map(service => startService(service.name, service.startFn))
+      servicesToStart.map((service) =>
+        startService(service.name, service.startFn)
+      )
     );
 
     const runningServices = services.filter(
-      (result) => result.status === 'fulfilled' && result.value.status === 'running'
+      (result) =>
+        result.status === 'fulfilled' && result.value.status === 'running'
     );
 
     const failedServices = services.filter(
-      (result) => result.status === 'fulfilled' && result.value.status === 'failed'
+      (result) =>
+        result.status === 'fulfilled' && result.value.status === 'failed'
     );
 
     if (runningServices.length > 0) {
@@ -85,16 +129,24 @@ async function main() {
 
     process.on('SIGINT', () => {
       logInfo(COMPONENT, 'Stopping services...');
-      modbusService?.stop();
-      opcuaService?.stop();
+      for (const service of modbusServices) {
+        service.stop();
+      }
+      for (const service of opcuaServices) {
+        service.stop();
+      }
       sparkplugService.stop();
       process.exit(0);
     });
 
     process.on('SIGTERM', () => {
       logInfo(COMPONENT, 'Stopping services...');
-      modbusService?.stop();
-      opcuaService?.stop();
+      for (const service of modbusServices) {
+        service.stop();
+      }
+      for (const service of opcuaServices) {
+        service.stop();
+      }
       sparkplugService.stop();
       process.exit(0);
     });

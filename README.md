@@ -38,10 +38,11 @@ The `sparkplug` subsection contains:
 
 ### OPC UA Configuration
 
-The `opcua` section contains the following properties:
+The `opcua` section is an array that supports multiple OPC UA servers. Each entry contains the following properties:
 
-- `enabled`: Whether OPC UA is enabled (true/false).
+- `enabled`: Whether this OPC UA server is enabled (true/false).
 - `serverUrl`: The OPC UA server URL.
+- `deviceName`: (Optional) The name for this OPC UA device. If not provided, automatically generates "device-opcua-1", "device-opcua-2", etc.
 - `tags`: An array of OPC UA tags to monitor.
 
 Each OPC UA tag contains the following properties:
@@ -53,11 +54,12 @@ Each OPC UA tag contains the following properties:
 
 ### Modbus Configuration
 
-The `modbus` section contains the following properties:
+The `modbus` section is an array that supports multiple Modbus TCP devices. Each entry contains the following properties:
 
-- `enabled`: Whether Modbus is enabled (true/false).
+- `enabled`: Whether this Modbus device is enabled (true/false).
 - `host`: The Modbus TCP server host.
 - `port`: The Modbus TCP server port.
+- `deviceName`: (Optional) The name for this Modbus device. If not provided, automatically generates "device-modbus-1", "device-modbus-2", etc.
 - `tags`: An array of Modbus tags to monitor.
 
 Each Modbus tag contains the following properties:
@@ -68,15 +70,57 @@ Each Modbus tag contains the following properties:
 - `interval`: The sampling interval in milliseconds.
 - `delta`: The minimum change threshold to trigger a data update.
 
+## Multiple Device Support
+
+The gateway now supports multiple OPC UA servers and Modbus TCP devices. Each device operates independently and publishes its metrics to separate Sparkplug B device topics.
+
+**Configuration Example:**
+
+```yaml
+opcua:
+  - enabled: true
+    serverUrl: opc.tcp://localhost:49320
+    deviceName: "OPC-UA-Device-1"
+    tags: [...]
+  - enabled: true
+    serverUrl: opc.tcp://localhost:49321
+    deviceName: "OPC-UA-Device-2"
+    tags: [...]
+
+modbus:
+  - enabled: true
+    host: localhost
+    port: 5020
+    deviceName: "Modbus-Device-1"
+    tags: [...]
+  - enabled: true
+    host: localhost
+    port: 5021
+    deviceName: "Modbus-Device-2"
+    tags: [...]
+```
+
 ## Usage
 
-The service starts automatically when the `pnpm start` command is executed. It connects to the configured OPC UA servers and Modbus TCP devices to monitor the specified tags. This data is then published to the configured MQTT broker using the Sparkplug B protocol. The gateway acts as a Sparkplug Edge Node, with its identity (`groupId`, `edgeNodeId`, `deviceId`) configured in `config.yaml`.
+The service starts automatically when the `pnpm start` command is executed. It connects to the configured OPC UA servers and Modbus TCP devices to monitor the specified tags. This data is then published to the configured MQTT broker using the Sparkplug B protocol. The gateway acts as a Sparkplug Edge Node, with its identity (`groupId`, `edgeNodeId`) configured in `config.yaml`.
+
+### Device Management
+
+The service now includes enhanced device management features:
+
+- **Multiple Device Support**: Connect to multiple OPC UA servers and Modbus devices simultaneously.
+- **Automatic Device Naming**: If `deviceName` is not specified in the configuration, devices are automatically named following the pattern `device-{protocol}-{number}` (e.g., `device-opcua-1`, `device-modbus-1`).
+- **Device Lifecycle Tracking**: Each device tracks registration time, last activity, and metrics count.
+- **Automatic Cleanup**: Inactive devices (no updates for 5 minutes) are automatically removed and a DDEATH message is sent.
+- **Health Monitoring**: The service logs device status every 10 minutes for monitoring purposes.
 
 Data is published using Sparkplug B messages, primarily:
 - **Device Birth (DBIRTH):** Announces the device and its metrics.
   - Topic: `spBv1.0/<groupId>/DBIRTH/<edgeNodeId>/<deviceId>`
 - **Device Data (DDATA):** Transmits metric values.
   - Topic: `spBv1.0/<groupId>/DDATA/<edgeNodeId>/<deviceId>`
+- **Device Death (DDEATH):** Announces device disconnection.
+  - Topic: `spBv1.0/<groupId>/DDEATH/<edgeNodeId>/<deviceId>`
 
 The specific tag data (name, value, type, timestamp) is contained within the payload of these Sparkplug B messages. For detailed information on the Sparkplug B specification, including full topic structures and payload formats, please refer to the official Sparkplug documentation.
 

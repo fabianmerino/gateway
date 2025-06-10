@@ -24,11 +24,14 @@ export class OpcuaService {
   private subscription?: ClientSubscription;
   private reconnectionManager: ReconnectionManager;
   private monitoredVariables: Map<string, MonitoredVariable> = new Map();
-
+  private deviceName: string;
   constructor(
     private readonly config: OpcuaConfig,
     private readonly sparkplugService: SparkplugService
   ) {
+    // Generate device name if not provided
+    this.deviceName = config.deviceName || 'device-opcua-1';
+
     this.reconnectionManager = new ReconnectionManager(
       COMPONENT,
       { initialDelay: 1000, maxDelay: 30000 },
@@ -77,15 +80,28 @@ export class OpcuaService {
           const value = dataValue.value.value;
           // Update local variable state
           const variable = this.monitoredVariables.get(tag.name);
-          if (variable?.value && Math.abs(value - variable.value) >= (tag.delta ?? 0)) {
+          if (
+            variable?.value &&
+            Math.abs(value - variable.value) >= (tag.delta ?? 0)
+          ) {
             variable.value = value;
             this.monitoredVariables.set(tag.name, variable);
-            this.sparkplugService.updateMetric(tag.name, value, tag.interval);
+            this.sparkplugService.updateMetric(
+              this.deviceName,
+              tag.name,
+              value,
+              tag.interval
+            );
             logInfo(COMPONENT, `Tag value updated: ${tag.name} = ${value}`);
           }
 
           // Update Sparkplug metric
-          this.sparkplugService.updateMetric(tag.name, value, tag.interval);
+          this.sparkplugService.updateMetric(
+            this.deviceName,
+            tag.name,
+            value,
+            tag.interval
+          );
           logInfo(COMPONENT, `Tag value updated: ${tag.name} = ${value}`);
         },
         { samplingInterval: tag.interval ?? 1000 }

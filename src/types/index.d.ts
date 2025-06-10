@@ -1,4 +1,3 @@
-
 export interface MonitoredVariable {
   name: string;
   type: string;

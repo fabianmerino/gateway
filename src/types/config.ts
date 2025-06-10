@@ -9,7 +9,6 @@ export interface MqttConfig {
 export interface SparkplugConfig {
   groupId: string;
   edgeNode: string;
-  deviceId: string;
   scadaHostId: string;
   publishPeriod: number;
 }
@@ -24,6 +23,7 @@ export interface OpcuaTag {
 export interface OpcuaConfig {
   enabled: boolean;
   serverUrl: string;
+  deviceName?: string;
   tags: OpcuaTag[];
 }
 
@@ -39,11 +39,12 @@ export interface ModbusConfig {
   enabled: boolean;
   host: string;
   port: number;
+  deviceName?: string;
   tags: ModbusTag[];
 }
 
 export interface AppConfig {
   mqtt: MqttConfig;
-  opcua: OpcuaConfig;
-  modbus: ModbusConfig;
+  opcua: OpcuaConfig[];
+  modbus: ModbusConfig[];
 }

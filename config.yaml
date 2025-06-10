@@ -6,35 +6,54 @@ mqtt:
   sparkplug:
     groupId: "Sparkplug B Devices"
     edgeNode: "Node-1"
-    deviceId: "Device-1"
     scadaHostId: "SCADA-1"
     publishPeriod: 1000
 
 opcua:
-  enabled: true
-  serverUrl: opc.tcp://localhost:49320
-  tags:
-    - nodeId: "ns=2;s=SIDESAL.despacho.ALCOHOL_FT01_PARCIAL"
-      name: "kg_tank_1302"
-      interval: 1000
-      delta: 0.5
-    - nodeId: "ns=2;s=SIDESAL.despacho.ALCOHOL_FT02_PARCIAL"
-      name: "kg_tank_1309"
-      interval: 2000
-      delta: 1.0
+  - enabled: true
+    serverUrl: opc.tcp://localhost:49320
+    deviceName: "OPC-UA-Device-1"
+    tags:
+      - nodeId: "ns=2;s=SIDESAL.despacho.ALCOHOL_FT01_PARCIAL"
+        name: "kg_tank_1302"
+        interval: 1000
+        delta: 0.5
+      - nodeId: "ns=2;s=SIDESAL.despacho.ALCOHOL_FT02_PARCIAL"
+        name: "kg_tank_1309"
+        interval: 2000
+        delta: 1.0
+  - enabled: false
+    serverUrl: opc.tcp://localhost:49321
+    deviceName: "OPC-UA-Device-2"
+    tags:
+      - nodeId: "ns=2;s=SIDESAL.despacho.ALCOHOL_FT03_PARCIAL"
+        name: "kg_tank_1310"
+        interval: 1500
+        delta: 0.3
 
 modbus:
-  enabled: true
-  host: localhost
-  port: 5020
-  tags:
-    - register: 40001
-      name: "flow_meter_1"
-      type: "holding"
-      interval: 1000
-      delta: 0.1
-    - register: 30001
-      name: "level_sensor_1"
-      type: "input"
-      interval: 2000
-      delta: 0.5
+  - enabled: true
+    host: localhost
+    port: 5020
+    deviceName: "Modbus-Device-1"
+    tags:
+      - register: 40001
+        name: "flow_meter_1"
+        type: "holding"
+        interval: 1000
+        delta: 0.1
+      - register: 30001
+        name: "level_sensor_1"
+        type: "input"
+        interval: 2000
+        delta: 0.5
+  - enabled: false
+    host: localhost
+    port: 5021
+    deviceName: "Modbus-Device-2"
+    tags:
+      - register: 40002
+        name: "flow_meter_2"
+        type: "holding"
+        interval: 1500
+        delta: 0.2

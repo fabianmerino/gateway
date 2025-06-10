@@ -14,11 +14,15 @@ export class ModbusService {
   private reconnectionManager: ReconnectionManager;
   private isConnected = false;
   private monitoredVariables: Map<string, MonitoredVariable> = new Map();
+  private deviceName: string;
 
   constructor(
     private readonly config: ModbusConfig,
     private readonly sparkplugService: SparkplugService
   ) {
+    // Generate device name if not provided
+    this.deviceName = config.deviceName || 'device-modbus-1';
+
     this.socket = new net.Socket();
     this.client = new Modbus.client.TCP(this.socket);
     this.setupSocketHandlers();
@@ -116,10 +120,13 @@ export class ModbusService {
         if (variable) {
           variable.value = value;
           this.monitoredVariables.set(tag.name, variable);
-        }
-
-        // Update Sparkplug B metric with the tag's interval
-        this.sparkplugService.updateMetric(tag.name, value, tag.interval);
+        } // Update Sparkplug B metric with the tag's interval
+        this.sparkplugService.updateMetric(
+          this.deviceName,
+          tag.name,
+          value,
+          tag.interval
+        );
         logInfo(COMPONENT, `Tag value updated: ${tag.name} = ${value}`);
       } catch (error) {
         logError(COMPONENT, `Error reading tag ${tag.name}`, error);

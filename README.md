@@ -32,7 +32,6 @@ The `sparkplug` subsection contains:
 
 - `groupId`: The Sparkplug group identifier.
 - `edgeNode`: The edge node identifier.
-- `deviceId`: The device identifier.
 - `scadaHostId`: The SCADA host identifier.
 - `publishPeriod`: The publish period in milliseconds.
 

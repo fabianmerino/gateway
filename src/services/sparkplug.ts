@@ -49,6 +49,24 @@ export class SparkplugService {
     });
 
     this.client?.on('connect', this.handleConnect.bind(this));
+
+    // Handle device command messages
+    this.client?.on('dcmd', (device, payload) => {
+      logInfo(COMPONENT, `Received device command for ${device}`, payload);
+      // Handle device rebirth
+      if (device === this.config.sparkplug.deviceId) {
+        const commands = payload.metrics || [];
+        for (const command of commands) {
+          if (command.name === 'Device Control/Rebirth' && command.value === true) {
+            logInfo(COMPONENT, 'Device rebirth command received');
+            this.sendDBirth();
+          } else {
+            logInfo(COMPONENT, `Received command: ${command.name} = ${command.value}`);
+          }
+        }
+      }
+
+    });
   }
 
   private handleConnect() {
@@ -128,7 +146,7 @@ export class SparkplugService {
         name,
         value: data.value,
         type: 'Double',
-        timestamp: Date.now(),
+        timestamp: data.lastPublished ?? Date.now(),
       })
     );
 
@@ -156,6 +174,7 @@ export class SparkplugService {
 
   private async publishMetric(name: string, value: number): Promise<void> {
     const payload: UPayload = {
+      timestamp: Date.now(),
       metrics: [
         {
           name,

@@ -4,3 +4,5 @@ dist
 messages.db
 messages.db-shm
 messages.db-wal
+
+bin

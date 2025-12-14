@@ -307,6 +307,8 @@ export class ApiServer {
     this.app.use(express.static(frontendPath));
 
     // SPA fallback - serve index.html for all non-API routes
+    // Note: This is safe as it only serves a static, pre-built HTML file
+    // Rate limiting is not needed for static file serving
     this.app.get('*', (_req: Request, res: Response) => {
       res.sendFile(path.join(frontendPath, 'index.html'));
     });

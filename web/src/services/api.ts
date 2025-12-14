@@ -18,6 +18,7 @@ class ApiService {
       headers: {
         'Content-Type': 'application/json',
       },
+      withCredentials: true, // Enable cookies for CSRF
     });
 
     // Load token from localStorage
@@ -25,6 +26,19 @@ class ApiService {
     if (this.token) {
       this.setAuthToken(this.token);
     }
+
+    // Request interceptor to add CSRF token
+    this.client.interceptors.request.use(
+      (config) => {
+        // Get CSRF token from cookie
+        const csrfToken = this.getCsrfTokenFromCookie();
+        if (csrfToken && config.method !== 'get') {
+          config.headers['x-csrf-token'] = csrfToken;
+        }
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
 
     // Response interceptor for error handling
     this.client.interceptors.response.use(
@@ -37,6 +51,17 @@ class ApiService {
         return Promise.reject(error);
       }
     );
+  }
+
+  private getCsrfTokenFromCookie(): string | null {
+    const cookies = document.cookie.split(';');
+    for (const cookie of cookies) {
+      const [name, value] = cookie.trim().split('=');
+      if (name === 'csrf_token') {
+        return value;
+      }
+    }
+    return null;
   }
 
   private setAuthToken(token: string): void {

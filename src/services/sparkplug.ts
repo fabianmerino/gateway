@@ -662,4 +662,11 @@ export class SparkplugService {
       expectedTags: device.expectedTags,
     };
   }
+
+  /**
+   * Get the connection status to the MQTT broker
+   */
+  public isConnectedToBroker(): boolean {
+    return this.isConnected;
+  }
 }

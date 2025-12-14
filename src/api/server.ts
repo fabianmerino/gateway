@@ -14,6 +14,7 @@ import type {
 import type { AppConfig } from '../types/config.js';
 import { logError, logInfo } from '../utils/logger/index.js';
 import { authenticateToken, login } from './auth.js';
+import { cookieParser, csrfCookieMiddleware, verifyCsrfToken } from './csrf.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -43,6 +44,9 @@ export class ApiServer {
       })
     );
 
+    // Cookie parsing for CSRF protection
+    this.app.use(cookieParser());
+
     // Rate limiting
     const limiter = rateLimit({
       windowMs: 15 * 60 * 1000, // 15 minutes
@@ -53,6 +57,10 @@ export class ApiServer {
     // Body parsing
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
+
+    // CSRF protection for API routes
+    this.app.use('/api/', csrfCookieMiddleware);
+    this.app.use('/api/', verifyCsrfToken);
 
     // Request logging
     this.app.use((req, _res, next) => {
@@ -140,7 +148,7 @@ export class ApiServer {
 
           const status: ConnectionStatus = {
             sparkplug: {
-              connected: true, // TODO: Get actual connection status
+              connected: this.sparkplugService.isConnectedToBroker(),
               broker: this.config.mqtt.broker,
               groupId: this.config.mqtt.sparkplug.groupId,
               edgeNode: this.config.mqtt.sparkplug.edgeNode,

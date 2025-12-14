@@ -1,4 +1,4 @@
-import { logInfo, logError } from './logger/index.js';
+import { logError } from './logger/index.js';
 
 interface RetryConfig {
   initialDelay: number;

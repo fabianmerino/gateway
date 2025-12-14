@@ -1,8 +1,8 @@
 import { newClient, type UPayload } from 'sparkplug-client';
 import type { MqttConfig } from '../types/config.js';
-import { logInfo, logError } from '../utils/logger/index.js';
-import { databaseService, type StoredMessage } from './database.js';
+import { logError, logInfo } from '../utils/logger/index.js';
 import { ReconnectionManager } from '../utils/reconnection.js';
+import { databaseService, type StoredMessage } from './database.js';
 
 const COMPONENT = 'SparkplugService';
 
@@ -28,7 +28,6 @@ export class SparkplugService {
   private devices: Map<string, DeviceMetrics> = new Map();
   private publishCheckInterval?: NodeJS.Timeout;
   private isConnected = false;
-  private reconnectInterval: NodeJS.Timeout | null = null;
   private reconnectionManager: ReconnectionManager;
   private deviceCounters: Map<string, number> = new Map(); // For auto-generating device names
   constructor(private readonly config: MqttConfig) {

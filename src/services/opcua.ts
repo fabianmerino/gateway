@@ -1,19 +1,19 @@
 import {
-  OPCUAClient,
-  MessageSecurityMode,
-  SecurityPolicy,
   AttributeIds,
-  TimestampsToReturn,
   type ClientSession,
   type ClientSubscription,
-  type MonitoringParametersOptions,
-  type ReadValueIdOptions,
   type DataValue,
+  MessageSecurityMode,
+  type MonitoringParametersOptions,
+  OPCUAClient,
+  type ReadValueIdOptions,
+  SecurityPolicy,
+  TimestampsToReturn,
 } from 'node-opcua';
 import type { OpcuaConfig } from '../types/config.js';
-import { logInfo, logError } from '../utils/logger/index.js';
-import { ReconnectionManager } from '../utils/reconnection.js';
 import type { MonitoredVariable } from '../types/index.js';
+import { logError, logInfo } from '../utils/logger/index.js';
+import { ReconnectionManager } from '../utils/reconnection.js';
 import type { SparkplugService } from './sparkplug.js';
 
 const COMPONENT = 'OpcuaService';

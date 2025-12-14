@@ -1,6 +1,6 @@
 import mqtt, { type MqttClient } from 'mqtt';
 import type { MqttConfig } from '../types/config.js';
-import { logInfo, logError } from '../utils/logger/index.js';
+import { logError, logInfo } from '../utils/logger/index.js';
 import { ReconnectionManager } from '../utils/reconnection.js';
 
 export const COMPONENT = 'MqttService';

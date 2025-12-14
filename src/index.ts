@@ -1,9 +1,10 @@
+import { ApiServer } from './api/server.js';
 import { readConfig } from './services/config.js';
+import { databaseService } from './services/database.js';
 import { ModbusService } from './services/modbus.js';
 import { OpcuaService } from './services/opcua.js';
-import { logInfo, logError, logWarn } from './utils/logger/index.js';
 import { SparkplugService } from './services/sparkplug.js';
-import { databaseService } from './services/database.js';
+import { logError, logInfo, logWarn } from './utils/logger/index.js';
 
 const COMPONENT = 'Main';
 
@@ -15,7 +16,7 @@ interface ServiceStatus {
 
 async function startService(
   name: string,
-  startFn: () => Promise<unknown>
+  startFn: () => Promise<unknown> | undefined
 ): Promise<ServiceStatus> {
   try {
     await startFn();
@@ -31,11 +32,19 @@ async function main() {
     const config = await readConfig();
     await databaseService.init();
     const sparkplugService = new SparkplugService(config.mqtt);
+    const apiServer = new ApiServer(
+      sparkplugService,
+      config,
+      Number(process.env.API_PORT) || 3000
+    );
 
     const servicesToStart: Array<{
       name: string;
-      startFn: () => Promise<unknown>;
-    }> = [{ name: 'Sparkplug', startFn: () => sparkplugService.start() }];
+      startFn: () => Promise<unknown> | undefined;
+    }> = [
+      { name: 'Sparkplug', startFn: () => sparkplugService.start() },
+      { name: 'API Server', startFn: () => apiServer.start() },
+    ];
 
     const modbusServices: ModbusService[] = [];
     const opcuaServices: OpcuaService[] = [];
@@ -142,6 +151,7 @@ async function main() {
         service.stop();
       }
       sparkplugService.stop();
+      apiServer.stop();
       process.exit(0);
     });
 
@@ -154,6 +164,7 @@ async function main() {
         service.stop();
       }
       sparkplugService.stop();
+      apiServer.stop();
       process.exit(0);
     });
   } catch (error) {

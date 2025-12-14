@@ -1,10 +1,10 @@
 import * as net from 'node:net';
 import * as Modbus from 'jsmodbus';
 import type { ModbusConfig, ModbusTag } from '../types/config.js';
-import { logInfo, logError } from '../utils/logger/index.js';
+import type { MonitoredVariable } from '../types/index.js';
+import { logError, logInfo } from '../utils/logger/index.js';
 import { ReconnectionManager } from '../utils/reconnection.js';
 import type { SparkplugService } from './sparkplug.js';
-import type { MonitoredVariable } from '../types/index.js';
 
 const COMPONENT = 'ModbusService';
 

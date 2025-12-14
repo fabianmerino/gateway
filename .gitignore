@@ -6,3 +6,7 @@ messages.db-shm
 messages.db-wal
 
 bin
+
+# Frontend
+web/node_modules
+web/dist

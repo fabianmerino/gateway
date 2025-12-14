@@ -2,6 +2,8 @@ import cors from 'cors';
 import express, { type Request, type Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { SparkplugService } from '../services/sparkplug.js';
 import type {
   ApiResponse,
@@ -12,6 +14,9 @@ import type {
 import type { AppConfig } from '../types/config.js';
 import { logError, logInfo } from '../utils/logger/index.js';
 import { authenticateToken, login } from './auth.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const COMPONENT = 'ApiServer';
 
@@ -289,13 +294,13 @@ export class ApiServer {
       }
     );
 
-    // 404 handler
-    this.app.use((_req: Request, res: Response) => {
-      const response: ApiResponse = {
-        success: false,
-        error: 'Not found',
-      };
-      res.status(404).json(response);
+    // Serve static frontend files
+    const frontendPath = path.join(__dirname, '../../web/dist');
+    this.app.use(express.static(frontendPath));
+
+    // SPA fallback - serve index.html for all non-API routes
+    this.app.get('*', (_req: Request, res: Response) => {
+      res.sendFile(path.join(frontendPath, 'index.html'));
     });
   }
 

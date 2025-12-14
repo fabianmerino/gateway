@@ -2,13 +2,39 @@
 
 This Industrial Monitoring Gateway collects data from OPC UA servers and Modbus TCP devices. It then publishes this data to an MQTT broker using the Sparkplug B protocol, acting as a Sparkplug Edge Node. The gateway also includes a local database to temporarily store messages if the MQTT broker is unavailable, ensuring data resilience.
 
+## Features
+
+- **OPC UA & Modbus Support**: Connect to multiple OPC UA servers and Modbus TCP devices
+- **Sparkplug B Protocol**: Publish data using the industry-standard Sparkplug B protocol
+- **Web Management Interface**: Modern React-based UI for monitoring and managing connections
+- **REST API**: Secure API for programmatic access to gateway data
+- **Data Resilience**: Local database for storing messages when the MQTT broker is unavailable
+- **Real-time Monitoring**: Live updates of device metrics and connection status
+
 ## Installation
 
-1. Install Node.js and pnpm (if not already installed).
+### Backend Setup
+
+1. Install Node.js (v18 or higher) and pnpm (if not already installed).
 2. Clone the repository.
-3. Install the dependencies by running `pnpm install` in the project directory.
+3. Install the backend dependencies by running `pnpm install` in the project root.
 4. Configure the project by editing the `config.yaml` file.
-5. Start the service by running `pnpm start` in the project directory.
+5. Build the backend: `pnpm build`
+
+### Frontend Setup
+
+1. Navigate to the `web` directory: `cd web`
+2. Install frontend dependencies: `pnpm install`
+3. Build the frontend: `pnpm build`
+
+### Running the Gateway
+
+Start the service by running `pnpm start` in the project root directory. This will:
+- Start the gateway services (OPC UA, Modbus, Sparkplug)
+- Start the REST API server on port 3000
+- Serve the web interface at http://localhost:3000
+
+You can customize the API port by setting the `API_PORT` environment variable.
 
 ## Configuration
 
@@ -122,6 +148,89 @@ Data is published using Sparkplug B messages, primarily:
   - Topic: `spBv1.0/<groupId>/DDEATH/<edgeNodeId>/<deviceId>`
 
 The specific tag data (name, value, type, timestamp) is contained within the payload of these Sparkplug B messages. For detailed information on the Sparkplug B specification, including full topic structures and payload formats, please refer to the official Sparkplug documentation.
+
+## Web Management Interface
+
+The gateway includes a modern web interface for monitoring and managing connections. Access it at http://localhost:3000 after starting the gateway.
+
+### Features
+
+- **Dashboard**: Real-time view of connection status and device metrics
+- **Device Monitoring**: View detailed information about each connected device
+- **Authentication**: Secure login with JWT-based authentication
+- **Auto-refresh**: Live updates every 5 seconds
+
+### Default Credentials
+
+- Username: `admin`
+- Password: `admin123`
+
+**Important**: Change the default credentials in production by modifying `src/api/auth.ts` and setting a secure JWT secret via the `JWT_SECRET` environment variable.
+
+## REST API
+
+The gateway provides a REST API for programmatic access to device and connection data.
+
+### Authentication
+
+All API endpoints (except `/api/auth/login` and `/api/health`) require authentication using a JWT token.
+
+1. **Login**: `POST /api/auth/login`
+   ```json
+   {
+     "username": "admin",
+     "password": "admin123"
+   }
+   ```
+   Response:
+   ```json
+   {
+     "success": true,
+     "data": {
+       "token": "jwt_token_here",
+       "username": "admin",
+       "expiresIn": 86400
+     }
+   }
+   ```
+
+2. Use the token in subsequent requests:
+   ```
+   Authorization: Bearer <token>
+   ```
+
+### API Endpoints
+
+- `GET /api/health` - Health check (no auth required)
+- `GET /api/status` - Get connection status and device summary
+- `GET /api/devices` - Get all devices with details
+- `GET /api/devices/:deviceId/metrics` - Get metrics for a specific device
+- `GET /api/config` - Get gateway configuration
+
+### Example Usage
+
+```bash
+# Login
+TOKEN=$(curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}' \
+  | jq -r '.data.token')
+
+# Get status
+curl http://localhost:3000/api/status \
+  -H "Authorization: Bearer $TOKEN"
+
+# Get devices
+curl http://localhost:3000/api/devices \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+## Environment Variables
+
+- `API_PORT`: Port for the REST API server (default: 3000)
+- `JWT_SECRET`: Secret key for JWT token generation (change in production!)
+- `CORS_ORIGIN`: CORS origin for API requests (default: *)
+- `NODE_ENV`: Environment mode (production/development)
 
 ## License
 

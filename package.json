@@ -14,11 +14,7 @@
     "format": "biome format --write ./src"
   },
   "dependencies": {
-    "@fastify/cors": "^11.2.0",
-    "@fastify/swagger": "^9.6.1",
-    "@fastify/swagger-ui": "^5.2.3",
     "better-sqlite3": "^12.5.0",
-    "fastify": "^5.6.2",
     "jsmodbus": "^4.0.10",
     "mqtt": "^5.14.1",
     "node-opcua": "^2.158.0",

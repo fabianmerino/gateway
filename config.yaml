@@ -6,7 +6,7 @@ mqtt:
   sparkplug:
     groupId: "Sparkplug B Devices"
     edgeNode: "Node-1"
-    scadaHostId: "SCADA-1"
+    scadaHostId: ""
     publishPeriod: 1000
 
 opcua:

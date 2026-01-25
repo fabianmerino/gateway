@@ -4,8 +4,8 @@ mqtt:
   username: user
   password: pass
   sparkplug:
-    groupId: "Sparkplug B Devices"
-    edgeNode: "Node-1"
+    groupId: "tgiperu"
+    edgeNode: "RE-01"
     scadaHostId: ""
     publishPeriod: 1000
 

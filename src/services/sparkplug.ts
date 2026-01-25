@@ -31,6 +31,8 @@ export class SparkplugService {
   private reconnectInterval: NodeJS.Timeout | null = null;
   private reconnectionManager: ReconnectionManager;
   private deviceCounters: Map<string, number> = new Map(); // For auto-generating device names
+  private isHostOnline = false;
+  private startTime = Date.now();
   constructor(private readonly config: MqttConfig) {
     this.reconnectionManager = new ReconnectionManager(
       COMPONENT,
@@ -71,6 +73,34 @@ export class SparkplugService {
 
     this.client?.on('connect', this.handleConnect.bind(this));
 
+    // Handle SCADA Host State
+    const stateTopic = `STATE/${this.config.sparkplug.scadaHostId}`;
+    this.client?.on('message', (topic, payload) => {
+      if (topic === stateTopic) {
+        const state = payload.toString().toLowerCase();
+        logInfo(COMPONENT, `SCADA Host state changed to: ${state}`);
+        this.isHostOnline = state === 'online';
+        if (this.isHostOnline) {
+          logInfo(COMPONENT, 'Host is online, triggering NBIRTH');
+          // The client library usually handles NBIRTH, but 3.0 recommends
+          // a rebirth when host becomes online if we were offline.
+          this.reconnectionManager.start();
+        }
+      }
+    });
+
+    // Handle NCMD (Node Control)
+    this.client?.on('ncmd', (payload) => {
+      logInfo(COMPONENT, 'Received Node Command', payload);
+      const commands = payload.metrics || [];
+      for (const command of commands) {
+        if (command.name === 'Node Control/Rebirth' && command.value === true) {
+          logInfo(COMPONENT, 'Node rebirth command received');
+          // Logic to trigger full rebirth
+        }
+      }
+    });
+
     // Handle device command messages
     this.client?.on('dcmd', (device, payload) => {
       logInfo(COMPONENT, `Received device command for ${device}`, payload);
@@ -110,6 +140,11 @@ export class SparkplugService {
     }
 
     this.sendStoredMessages();
+
+    // Subscribe to State topic
+    const stateTopic = `STATE/${this.config.sparkplug.scadaHostId}`;
+    this.client?.subscribeTopic(stateTopic);
+    logInfo(COMPONENT, `Subscribed to state topic: ${stateTopic}`);
   }
 
   async connect() {
@@ -320,8 +355,8 @@ export class SparkplugService {
       // First ensure DBIRTH is sent if needed
       this.checkAndSendDBirth(device.deviceId);
 
-      // Only publish metrics if DBIRTH has been sent
-      if (device.dbirthSent) {
+      // Only publish metrics if DBIRTH has been sent and Host is online
+      if (device.dbirthSent && (this.isHostOnline || !this.config.sparkplug.scadaHostId)) {
         for (const [name, metric] of device.metrics.entries()) {
           if (now - metric.lastPublished >= metric.interval) {
             this.publishMetric(device.deviceId, name, metric.value);
